@@ -9,8 +9,23 @@
 #include <czmq.h>
 
 #define PRODUCERS_COUNT 3
-#define ADDITIONAL_THREADS_PER_CONSUMER 2
-#define CONSUMERS_COUNT 1
+#define ADDITIONAL_THREADS_PER_CONSUMER 2 ///< Number of additional workers per Consumer. Max 99.
+#define CONSUMERS_COUNT 1 ///< Total Number of Consumers. Max 99.
+#define MAX_ENDPOINT_STR_LENGTH 50
+
+/**
+* This is a worker function for the Log Broker to offload consumer transmissions
+* @param[in] endpoints An char array containing worker_id and consumer_endpoint
+*/
+void* log_worker(void* arg){
+    char *worker_transport = ((char**)arg)[0];
+    char *endpoint = ((char**)arg)[1];
+
+    printf("Inhouse Transport ID - %s\n", worker_transport);
+    printf("Consumer Endpoint - %s\n", endpoint);
+
+    pthread_exit(NULL);
+}
 
 void* log_broker(void* arg)
 {
@@ -19,10 +34,26 @@ void* log_broker(void* arg)
     /// In-socket for the logger
     zsock_t *broker_in = zsock_new_router ("ipc:///tmp/cfw/logger_in");
 
-    printf("Log Broker Initialized.\n");
-    printf("Listening...\n");
+    char consumers[1][MAX_ENDPOINT_STR_LENGTH] = { "ipc:///tmp/cfw/cons_in_1" };
+    zsock_t **consumer_threads = malloc( CONSUMERS_COUNT * ADDITIONAL_THREADS_PER_CONSUMER * sizeof(zsock_t*) );
+
+    printf("Log Broker Initialized.\nConsumer Workers Initializing...\n");
+
+    for (int cons = 0; cons < CONSUMERS_COUNT; cons++){
+        for(int worker = 0; worker < ADDITIONAL_THREADS_PER_CONSUMER; worker++){
+            char **params = malloc( sizeof(char*) * 2 );
+            params[0] = malloc( sizeof(char) * MAX_ENDPOINT_STR_LENGTH );
+            sprintf(params[0], "ipc:///tmp/cfw/c_%dw_%d", cons, worker); ///< Worker Listener Endpoint to use for further communication
+            params[1] = malloc( sizeof(char) * MAX_ENDPOINT_STR_LENGTH );
+            strcpy(params[1], consumers[cons]); ///< Consumer Destination Endpoint
+            pthread_t worker_thread;
+            pthread_create(&worker_thread, NULL, &log_worker, (void*)params);
+        }
+    }
+
+    printf("Consumer Workers Initialized.\nListening...\n");
     while (1) {
-        char *flagger = zstr_recv (broker_in); ///< Flag to identify Producer (or) Signal to the Log Broker from Main Thread
+        char *flagger = zstr_recv (broker_in); ///< Flag to identify Producer (or) Signal from Main Thread to the Log Broker
         if(flagger && strcmp(flagger, "END") == 0) {
             break;
         }

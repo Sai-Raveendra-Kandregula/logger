@@ -1,6 +1,6 @@
 CC=gcc
 
-all: clean logger.o
+all: logger.o
 	${CC} -o logger logger.o -lczmq -lpthread
 
 logger.o:
