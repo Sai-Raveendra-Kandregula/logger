@@ -174,8 +174,9 @@ void* producer(void* arg){
         zstr_sendf (pusher, "Log number - %d", pro_num);
     }
 
+    /// Await any pending Transmissions
+    sleep(5);
     zsock_destroy (&pusher);
-
     printf("Producer %d is now Terminated.\n", pro_num);
     pthread_exit(NULL);
 }
