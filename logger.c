@@ -12,6 +12,10 @@
 #define ADDITIONAL_THREADS_PER_CONSUMER 2 ///< Number of additional workers per Consumer.
 #define CONSUMERS_COUNT 1 ///< Total Number of Consumers.
 #define MAX_ENDPOINT_STR_LENGTH 50 ///< Length limit for Worker and Consumer Endpoints.
+
+/// Signalling messages used by the sockets
+#define INIT_SIGNAL "INIT" ///< Message used to initialise connection b/w Router and Dealer Sockets.
+#define READY_SIGNAL "READY" ///< Message used as Ready Signal.
 #define END_SIGNAL "END" ///< Message used as Terminate Signal.
 
 /**
@@ -57,7 +61,7 @@ void* log_worker(void* arg){
 
     /// Socket to send messages to Consumer
     zsock_t *consumer = zsock_new_push(consumer_endpoint);
-    sleep(0.1);
+    // sleep(0.1);
 
     /// Socket to listen for messages from Broker
     zsock_t *worker_listener = zsock_new_pull(worker_transport);
@@ -87,27 +91,21 @@ void* log_broker(void* arg)
 {
     printf("Initializing Log Broker...\n");
 
+    /// In-socket for the logger
+    zsock_t *broker_in = zsock_new_router ("ipc:///tmp/cfw/logger_in");
+
+    printf("Log Broker Initialized.\nConsumer Workers Initializing...\n");
+
     pthread_t consumer_thread;
     /// Create Consumer thread
     pthread_create( &consumer_thread, NULL, &consumer, NULL );
-
-    /// In-socket for the logger
-    zsock_t *broker_in = zsock_new_router ("ipc:///tmp/cfw/logger_in");
 
     char consumers[CONSUMERS_COUNT][MAX_ENDPOINT_STR_LENGTH] = { "ipc:///tmp/cfw/cons_in_1" };
 
     int worker_sockets_count = CONSUMERS_COUNT * ADDITIONAL_THREADS_PER_CONSUMER;
     zsock_t **worker_sockets = malloc( worker_sockets_count * sizeof(zsock_t*) );
 
-    // zsock_t **consumer_sockets = malloc( CONSUMERS_COUNT * sizeof(zsock_t*) );
-
-    printf("Log Broker Initialized.\nConsumer Workers Initializing...\n");
-
     for (int cons = 0; cons < CONSUMERS_COUNT; cons++){
-
-	/// Create Consumer Sockets
-	// consumer_sockets[cons] = zsock_new_router(consumers[cons]);
-
         for(int worker = 0; worker < ADDITIONAL_THREADS_PER_CONSUMER; worker++){
             char **params = malloc( sizeof(char*) * 2 );
             params[0] = malloc( sizeof(char) * MAX_ENDPOINT_STR_LENGTH );
@@ -124,8 +122,14 @@ void* log_broker(void* arg)
         }
     }
 
-    printf("Consumer Workers Initialized.\nListening...\n");
+    printf("Consumer Workers Initialized.\n");
     int isShutdownRequested = 0;
+
+    int *isReady = (int*)arg;
+    *isReady = 1;
+
+    /// Start Listening to Messages
+    printf("Listening...\n");
     while (!isShutdownRequested) {
             for(int worker = 0; worker < ADDITIONAL_THREADS_PER_CONSUMER; worker++){
 	        for(int consumer = 0; consumer < CONSUMERS_COUNT; consumer++){
@@ -163,13 +167,16 @@ void* producer(void* arg){
     zsock_t *pusher = zsock_new_dealer ("ipc:///tmp/cfw/logger_in");
     int pro_num = (int)arg;
 
-    printf("Producer #: %d\n", pro_num);
+    printf("Producer %d is now UP.\n", pro_num);
     for (int i = 1; i <= 5; i++)
     {
         sleep(1); ///< Simulating some work being done
         zstr_sendf (pusher, "Log number - %d", pro_num);
     }
+
     zsock_destroy (&pusher);
+
+    printf("Producer %d is now Terminated.\n", pro_num);
     pthread_exit(NULL);
 }
 
@@ -180,13 +187,17 @@ void main(){
     /// Used to send shutdown signal to the logging in socket. Function can be extended, like added consumers, etc.
     zsock_t *log_signaler = zsock_new_dealer("ipc:///tmp/cfw/logger_in");
 
+    int isLogBrokerSocketInitialized = 0;
+    /// Creating Log Broker thread
+    pthread_create(&log_broker_thread, NULL, &log_broker, (void*)(&isLogBrokerSocketInitialized));
+
+    printf("Waiting for Log Broker to start...\n");
+    while(isLogBrokerSocketInitialized == 0){}
+
     /// Creating Producer threads
     for (int i = 0; i < PRODUCERS_COUNT; i++){
         pthread_create(&(producers[i]), NULL, &producer, (void*)i);
     }
-
-    /// Creating Log Broker thread
-    pthread_create(&log_broker_thread, NULL, &log_broker, NULL);
 
     /// Join all Producers before Termination.
 
