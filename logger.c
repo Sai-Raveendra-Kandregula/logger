@@ -72,7 +72,7 @@ void* log_worker(void* arg){
         /// Signal Handling
         if(msg && strcmp(msg, END_SIGNAL) == 0) {
             /// First Worker of each Consumer (based on creation index) sends END Signal to Consumer.
-            if(isFirstWorkerForConsumer(worker_transport)) { printf("Killing Consumer.\n"); zstr_send( consumer, END_SIGNAL ); }
+            if(isFirstWorkerForConsumer(worker_transport)) { zstr_send( consumer, END_SIGNAL ); }
             printf("%s - Terminating...\n", worker_transport);
             break;
         }
