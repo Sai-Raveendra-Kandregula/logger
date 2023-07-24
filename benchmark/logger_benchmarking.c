@@ -111,7 +111,7 @@ void* log_broker(void* arg)
     zsock_t *broker_in = zsock_new_router ("ipc:///tmp/cfw/logger_in");
 
     // printf("Log Broker Initialized.\nConsumer Workers Initializing...\n");
-    char inflow_timestamps[PRODUCERS_COUNT * PER_PRODUCER_MSG_COUNT][MSG_MAX_LENGTH];
+    char inflow_timestamps[PRODUCERS_COUNT * PER_PRODUCER_MSG_COUNT][(MSG_MAX_LENGTH * 2) + 1];
     int message_count = 0;
 
     pthread_t consumer_thread;
@@ -184,12 +184,14 @@ void* log_broker(void* arg)
     char filename[25];
     sprintf(filename, "%dP_%dM.csv", PRODUCERS_COUNT, PER_PRODUCER_MSG_COUNT);
     FILE *fp = fopen(filename, "w");
+    fclose(fp);
+    fp = fopen(filename, "a");
 	if(fp)//will be null if failed to open
 	{
 	    for(int i = 0; i < message_count; i++){
 		fprintf(fp, "%s\r\n", inflow_timestamps[i]);
 		}
-	    fclose(fp);
+            fclose(fp);
 	}
         else{
 	    for(int i = 0; i < message_count; i++){
