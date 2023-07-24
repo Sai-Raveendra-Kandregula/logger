@@ -187,7 +187,7 @@ void* log_broker(void* arg)
 	if(fp)//will be null if failed to open
 	{
 	    for(int i = 0; i < message_count; i++){
-		fprintf(fp, "%s\\r\\n", inflow_timestamps[i]);
+		fprintf(fp, "%s\r\n", inflow_timestamps[i]);
 		}
 	    fclose(fp);
 	}
