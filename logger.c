@@ -68,15 +68,19 @@ void* log_worker(void* arg){
 
     while (1) {
         char *msg = zstr_recv ( worker_listener );
+
+        /// Signal Handling
         if(msg && strcmp(msg, END_SIGNAL) == 0) {
             /// First Worker of each Consumer (based on creation index) sends END Signal to Consumer.
             if(isFirstWorkerForConsumer(worker_transport)) { printf("Killing Consumer.\n"); zstr_send( consumer, END_SIGNAL ); }
             printf("%s - Terminating...\n", worker_transport);
             break;
         }
+        // End of Signal Handling
+
         if(msg && !(strcmp(msg, "") == 0)) {
             // printf("%s\n", msg);
-	    zstr_send( consumer, msg );
+	    zstr_send( consumer, msg ); ///< Forward Message to Consumer
         }
         zstr_free(&msg);
     }
@@ -87,6 +91,10 @@ void* log_worker(void* arg){
     pthread_exit(NULL);
 }
 
+/**
+* Broker Thread which acts as first Point of Contact for Producers
+* @param[in] arg An int pointer to indicate the readiness of the Broker Thread
+*/
 void* log_broker(void* arg)
 {
     printf("Initializing Log Broker...\n");
@@ -100,11 +108,14 @@ void* log_broker(void* arg)
     /// Create Consumer thread
     pthread_create( &consumer_thread, NULL, &consumer, NULL );
 
+    /// Consumer Endpoints Array
     char consumers[CONSUMERS_COUNT][MAX_ENDPOINT_STR_LENGTH] = { "ipc:///tmp/cfw/cons_in_1" };
 
+    /// Consumer Worker Sockets Array
     int worker_sockets_count = CONSUMERS_COUNT * ADDITIONAL_THREADS_PER_CONSUMER;
     zsock_t **worker_sockets = malloc( worker_sockets_count * sizeof(zsock_t*) );
 
+    /// Creating Sockets for Each Consumer Worker
     for (int cons = 0; cons < CONSUMERS_COUNT; cons++){
         for(int worker = 0; worker < ADDITIONAL_THREADS_PER_CONSUMER; worker++){
             char **params = malloc( sizeof(char*) * 2 );
@@ -134,10 +145,14 @@ void* log_broker(void* arg)
             for(int worker = 0; worker < ADDITIONAL_THREADS_PER_CONSUMER; worker++){
 	        for(int consumer = 0; consumer < CONSUMERS_COUNT; consumer++){
  		    char *msg = zstr_recv (broker_in); ///< Flag to identify Producer (or) Signal from Main Thread to the Log Broker
+
+                    /// Signal Handling
         	    if(msg && strcmp(msg, END_SIGNAL) == 0) {
             	        isShutdownRequested = 1;
 			break;
         	    }
+                    // Signal Handling Ends
+
                     if( msg && !(strcmp(msg, "") == 0) ) {
 	      	        // printf("From Worker\n");
 		        zstr_send( worker_sockets[ (consumer * ADDITIONAL_THREADS_PER_CONSUMER) + worker ] , msg);
@@ -160,6 +175,8 @@ void* log_broker(void* arg)
     pthread_join( consumer_thread, NULL );
 
     zsock_destroy (&broker_in);
+
+    printf("Log Broker Terminated.\n");
     pthread_exit(NULL);
 }
 
@@ -171,7 +188,7 @@ void* producer(void* arg){
     for (int i = 1; i <= 5; i++)
     {
         sleep(1); ///< Simulating some work being done
-        zstr_sendf (pusher, "Log number - %d", pro_num);
+        zstr_sendf (pusher, "Log number - %d", pro_num); ///< Send Message to Log Broker
     }
 
     /// Await any pending Transmissions
@@ -200,12 +217,12 @@ void main(){
         pthread_create(&(producers[i]), NULL, &producer, (void*)i);
     }
 
-    /// Join all Producers before Termination.
-
+    /// Join all Producers to Main Thread before Termination.
     for (int i = 0; i < PRODUCERS_COUNT; i++){
         pthread_join( producers[i], NULL );
     }
 
+    /// Send END signal to LogBroker
     zstr_send(log_signaler, "END");
     pthread_join( log_broker_thread, NULL );
     zsock_destroy(&log_signaler);
