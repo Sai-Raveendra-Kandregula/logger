@@ -1,3 +1,7 @@
+/**
+* @file logger_benchmarking_cli.c
+* @brief Customisable Logging Pipeline with Load Balancing
+*/
 #define _GNU_SOURCE
 #include <sched.h>
 #include <pthread.h>
@@ -38,13 +42,12 @@ int stick_this_thread_to_core(int core_id) {
    CPU_ZERO(&cpuset);
    CPU_SET(core_id, &cpuset);
 
-   pthread_t current_thread = pthread_self();    
+   pthread_t current_thread = pthread_self();
    return pthread_setaffinity_np(current_thread, sizeof(cpu_set_t), &cpuset);
 }
 
 /**
-* This is a worker function for the Log Broker to offload consumer transmissions
-* @param[in] arg An char array containing worker_id and consumer_endpoint, cast to a void pointer.
+* Consumer Function
 */
 void* consumer(void* arg){
     zsock_t *consumer = zsock_new_pull("ipc:///tmp/cfw/cons_in_1");
@@ -80,6 +83,10 @@ int isFirstWorkerForConsumer(char *worker_transport){
    return (worker == 0);
 }
 
+/**
+* This is a worker function for the Log Broker to offload consumer transmissions
+* @param[in] arg An char array containing worker_id and consumer_endpoint, cast to a void pointer.
+*/
 void* log_worker(void* arg){
     char *worker_transport = ((char**)arg)[0]; ///< Transport via which Log Broker Communicates with Worker
     char *consumer_endpoint = ((char**)arg)[1]; ///< Transport via which Worker communicates with Consumer
@@ -234,6 +241,7 @@ void* log_broker(void* arg)
     pthread_exit(NULL);
 }
 
+/// Producer Function
 void* producer(void* arg){
     int num_cores = sysconf(_SC_NPROCESSORS_ONLN);
     int pro_num = (int)arg;
@@ -259,6 +267,7 @@ void* producer(void* arg){
 }
 
 int main(int argc, char **argv){
+    /// Reading CLI Parameters
     for (int i = 1; i < argc; i++){
         if(strcmp(argv[i], "--np") == 0){
             int val;
@@ -282,7 +291,6 @@ int main(int argc, char **argv){
                 printf("%s is a invalid value for --nm\n", argv[i]);
             }
         }
-        // if(bind_to_cores)
         else if(strcmp(argv[i], "--bind") == 0){ ///< Messages per Producer
             bind_to_cores = 1;
             printf("Binding Producers and Logging thread to Cores.\n");
