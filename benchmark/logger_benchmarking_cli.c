@@ -201,9 +201,9 @@ void* log_broker(void* arg)
     }
 
 
-    char filename[25];
-    if(bind_to_cores) sprintf(filename, "%dP_%dM_bound.csv", u_PRODUCERS_COUNT, u_PER_PRODUCER_MSG_COUNT);
-    else sprintf(filename, "%dP_%dM.csv", u_PRODUCERS_COUNT, u_PER_PRODUCER_MSG_COUNT);
+    char filename[50];
+    if(bind_to_cores) sprintf(filename, "results_raw/%dP_%dM_bound.csv", u_PRODUCERS_COUNT, u_PER_PRODUCER_MSG_COUNT);
+    else sprintf(filename, "results_raw/%dP_%dM.csv", u_PRODUCERS_COUNT, u_PER_PRODUCER_MSG_COUNT);
     FILE *fp = fopen(filename, "w");
     fclose(fp);
     fp = fopen(filename, "a");
