@@ -2,6 +2,7 @@ import csv
 import os
 import datetime
 import shutil
+import subprocess
 
 executable_path = "./log_benchmarker_cli --np %d --nm %d %s"
 configuration_file = "benchmark_conf.csv"
@@ -26,7 +27,8 @@ with open(configuration_file, "r") as conf_file:
                 cpu_bind = "--bind" if (line[2] == "y" or line[2] == "Y") else ""
 		cmd = executable_path %(procnt, msgcnt, cpu_bind)
 		# print(cmd)
-		os.system( cmd )
+		# os.system( cmd )
+		subprocess.check_call( cmd, shell = True )
 		line_count += 1
 
 os.system( postprocessor )
