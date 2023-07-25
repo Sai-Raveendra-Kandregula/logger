@@ -50,7 +50,7 @@ for filename in raw_files:
         sd_val = statistics.stdev(deltas)
         results.append( Stats(file_info[0], file_info[1], mean_val, min_val, max_val, sd_val, filename.__contains__("bound")) )
 
-result_filename = datetime.datetime.now().strftime("results/results_%Y-%m-%d %H:%M:%S.csv");
+result_filename = os.path.join( "results", datetime.datetime.now().strftime("results_%Y-%m-%d %H%M%S.csv") )
 
 with open(result_filename, mode ='w') as result_file:
     csvwriter = csv.writer(result_file)
