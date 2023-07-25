@@ -300,8 +300,8 @@ int main(int argc, char **argv){
     }
 
     pthread_t log_broker_thread;
-    pthread_t producers[u_PRODUCERS_COUNT];
-
+    pthread_t *producers = malloc(u_PRODUCERS_COUNT * sizeof(pthread_t));
+    printf("Created Producer Threads.\n");
     /// Used to send shutdown signal to the logging in socket. Function can be extended, like added consumers, etc.
     zsock_t *log_signaler = zsock_new_dealer("ipc:///tmp/cfw/logger_in");
 
